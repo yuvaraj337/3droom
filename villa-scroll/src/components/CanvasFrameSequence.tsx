@@ -20,7 +20,7 @@ const defaultFramePath = (index: number) => {
 
 export default function CanvasFrameSequence({
   totalFrames = 192,
-  initialPreloadCount = 150,
+  initialPreloadCount = 192, // Load ALL 192 frames at once
   framePathGetter = defaultFramePath,
   className = '',
   onLoaded,
@@ -33,7 +33,6 @@ export default function CanvasFrameSequence({
   const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [isPreloaderVisible, setIsPreloaderVisible] = useState<boolean>(true);
   const [isPreloaderFading, setIsPreloaderFading] = useState<boolean>(false);
-  const [backgroundLoadedCount, setBackgroundLoadedCount] = useState<number>(0);
 
   // Active frame index & animation frame reference tracking
   const currentFrameRef = useRef<number>(1);
@@ -111,10 +110,10 @@ export default function CanvasFrameSequence({
     [drawFrame]
   );
 
-  // Preloading phase 1 (Initial 150 frames) & phase 2 (Background caching)
+  // Preload ALL 192 frames upfront in optimized parallel batches
   useEffect(() => {
     let isMounted = true;
-    const initialCount = Math.min(initialPreloadCount, totalFrames);
+    const countToLoad = Math.min(initialPreloadCount, totalFrames);
     let loadedCount = 0;
 
     const loadSingleFrame = (index: number): Promise<HTMLImageElement> => {
@@ -138,17 +137,17 @@ export default function CanvasFrameSequence({
       });
     };
 
-    const loadInitialFrames = async () => {
-      const batchSize = 15;
-      for (let i = 1; i <= initialCount; i += batchSize) {
+    const loadAllFramesUpfront = async () => {
+      const batchSize = 20; // High speed batching
+      for (let i = 1; i <= countToLoad; i += batchSize) {
         if (!isMounted) break;
         const batchPromises = [];
-        for (let j = i; j < i + batchSize && j <= initialCount; j++) {
+        for (let j = i; j < i + batchSize && j <= countToLoad; j++) {
           batchPromises.push(
             loadSingleFrame(j).then((img) => {
               loadedCount++;
               if (isMounted) {
-                const progress = Math.min(100, Math.floor((loadedCount / initialCount) * 100));
+                const progress = Math.min(100, Math.floor((loadedCount / countToLoad) * 100));
                 setLoadingProgress(progress);
               }
               return img;
@@ -172,36 +171,9 @@ export default function CanvasFrameSequence({
           setIsPreloaderVisible(false);
         }
       }, 500);
-
-      // Phase 2: Asynchronous non-blocking background frame pre-fetching
-      if (totalFrames > initialCount) {
-        loadRemainingFramesInBackground(initialCount + 1, totalFrames);
-      }
     };
 
-    const loadRemainingFramesInBackground = async (start: number, end: number) => {
-      let bgLoaded = 0;
-      const bgBatchSize = 4;
-      for (let i = start; i <= end; i += bgBatchSize) {
-        if (!isMounted) break;
-        // Non-blocking micro-delay for smooth 60FPS scroll feel
-        await new Promise((r) => setTimeout(r, 45));
-        const promises = [];
-        for (let j = i; j < i + bgBatchSize && j <= end; j++) {
-          promises.push(
-            loadSingleFrame(j).then(() => {
-              bgLoaded++;
-              if (isMounted) {
-                setBackgroundLoadedCount(bgLoaded);
-              }
-            })
-          );
-        }
-        await Promise.all(promises);
-      }
-    };
-
-    loadInitialFrames();
+    loadAllFramesUpfront();
 
     return () => {
       isMounted = false;
@@ -211,12 +183,11 @@ export default function CanvasFrameSequence({
       if (resizeRafIdRef.current !== null) {
         cancelAnimationFrame(resizeRafIdRef.current);
       }
-      // Memory cleanup: Clear cached image objects on unmount
       imagesRef.current.clear();
     };
   }, [totalFrames, initialPreloadCount, framePathGetter, drawFrame, onLoaded]);
 
-  // Optimized Debounced Window Resize Handler
+  // Window Resize Handler
   useEffect(() => {
     const handleResize = () => {
       if (resizeRafIdRef.current !== null) {
@@ -237,7 +208,7 @@ export default function CanvasFrameSequence({
     };
   }, [drawFrame]);
 
-  // GSAP ScrollTrigger 1:1 scroll progress scrubbing with automatic cleanup
+  // GSAP ScrollTrigger 1:1 scroll progress scrubbing
   useEffect(() => {
     gsap.registerPlugin(ScrollTrigger);
 
@@ -312,19 +283,9 @@ export default function CanvasFrameSequence({
             </div>
 
             <p className="text-xs font-mono text-gray-400 tracking-wider uppercase">
-              Loading Initial {initialPreloadCount} Frames ({loadingProgress}%)
+              Preloading All {totalFrames} Frames ({loadingProgress}%)
             </p>
           </div>
-        </div>
-      )}
-
-      {/* Background Cache Indicator */}
-      {!isPreloaderVisible && backgroundLoadedCount > 0 && backgroundLoadedCount < (totalFrames - initialPreloadCount) && (
-        <div className="absolute bottom-4 right-4 z-20 px-3 py-1.5 rounded-full bg-black/60 border border-white/10 backdrop-blur-md flex items-center gap-2 text-[10px] font-mono text-gray-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-ping" />
-          <span>
-            Caching frames: {initialPreloadCount + backgroundLoadedCount}/{totalFrames}
-          </span>
         </div>
       )}
     </div>

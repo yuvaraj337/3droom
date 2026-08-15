@@ -26,7 +26,7 @@ export default function VillaScrollPage() {
         <section id="canvas-section" className="relative w-full">
           <CanvasFrameSequence
             totalFrames={192}
-            initialPreloadCount={150}
+            initialPreloadCount={192}
             overlayContent={
               <>
                 <HeroOverlay />
@@ -62,9 +62,9 @@ export default function VillaScrollPage() {
               <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-6 font-mono text-lg group-hover:bg-emerald-500 group-hover:text-black transition-all">
                 02
               </div>
-              <h3 className="text-xl font-medium mb-3">150-Frame Preloader</h3>
+              <h3 className="text-xl font-medium mb-3">192-Frame Upfront Load</h3>
               <p className="text-sm text-gray-400 leading-relaxed">
-                Instant visual preloader that unmasks the sequence at 150 frames, while caching remaining frames in the background.
+                All 192 frames compressed from ~12.9 MB down to ~4.7 MB total and preloaded upfront at 100% before playback.
               </p>
             </div>
 
